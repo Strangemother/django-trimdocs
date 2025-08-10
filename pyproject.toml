@@ -1,0 +1,52 @@
+# Project configuration for django-trimdocs
+
+[project]
+name = "trimdocs"
+authors = [
+  { name = "Strangemother", email = "django-trim@strangemother.com" },
+]
+description = "Django Trim Docs: author-friendly docs pipeline for Django projects, with CLI and management command to compile partial Markdown into framed Markdown/HTML."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Framework :: Django",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+license = { text = "MIT" }
+dynamic = ["version"]
+dependencies = [
+  "Django>=3.2",
+  "django-trim>=0.4.0",  # Uses django-trim; django-trim does not depend on this package
+  "markdown>=3.5",
+  "Jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+]
+
+[project.scripts]
+trim-docs = "trimdocs.cli:main"
+trimdocs = "trimdocs.cli:main"
+
+[tool.setuptools.package-data]
+trimdocs = [
+  "templates/**/*.html",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+"Homepage" = "https://github.com/Strangemother/django-trimdocs"
+"Bug Tracker" = "https://github.com/Strangemother/django-trimdocs/issues"
