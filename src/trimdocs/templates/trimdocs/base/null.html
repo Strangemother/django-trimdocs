@@ -1,0 +1,12 @@
+{% comment "What" %}
+    The _null_ or "None" file, serves as the _blank_ frame for the
+    markdown root include.
+
+    Every markdown file extends from the root, if no extends are applied, the content is simply included within the parent template (this one)
+
+    This ensures the base import can always use block `body.main`
+
+    Use this as the `trimdocs_global_frame`
+
+        context['trimdocs_global_frame'] = "trimdocs/base.html"
+{% endcomment %}{% block body.main %}<p>base file 'body' block</p>{% endblock body.main %}

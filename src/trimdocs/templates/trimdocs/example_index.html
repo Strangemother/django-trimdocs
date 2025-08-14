@@ -1,0 +1,31 @@
+{% extends trimdocs_global_frame %}
+{% load markdown %}
+
+{% block head.extra %}
+  <style>
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        white-space: pre-line;
+      }
+  </style>
+{% endblock head.extra %}
+
+{% block body.main %}
+# No Configuration
+
+This is your default index for the `trimdocs/`.
+
+If you're viewing this file. it means the _index_ page of the docs directory does not exist, or is not configured.
+
++ Src Directory exists: {{ has_src_docs }}
++ Path: {{ src_docs_path}}
+
+Ensure to point your docs directory to a location with a:
+
++ readme.md
++ index.md
++ _index.md
++ contents.md
++ _contents.md
+{% endblock body.main %}

@@ -1,0 +1,7 @@
+{% extends "trimdocs/base/base.html" %}
+{% load markdown %}
+{% block body.main %}
+  {% markdown %}
+    {% include "trimdocs/srcdocs/index.md" %}
+  {% endmarkdown %}
+{% endblock body.main %}

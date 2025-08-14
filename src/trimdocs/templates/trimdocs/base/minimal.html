@@ -1,0 +1,36 @@
+{% extends "./base.html" %}
+{% load link %}
+
+{% block head.extra %}
+    {% link.css 'css/trimdocs/minimal.css' %}
+{% endblock head.extra %}
+
+{% block body %}
+
+    <header>
+        <nav>
+            <ul class="widthed">
+                <li><a href="#">Home</a></li>
+                <li><a href="#">Contents</a></li>
+                <li><a href="#">Indicies</a></li>
+                <li class="spacer"></li>
+                <li><a href="#">Info</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="breadcrumb-container">
+        <ul class="breadcrumbs widthed">
+            <li>
+                <a href="#">{root}</a>
+            </li>
+            {% for part in object_path_info.given_relative.parts %}
+            <li>
+                <a href="#">{{ part }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {{ block.super }}
+{% endblock body %}

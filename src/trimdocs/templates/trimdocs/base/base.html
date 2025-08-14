@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+{% comment "What" %}
+    This is a base file for all initial markdown to browser rendered files.
+
+    It serves a wrapper and very basic CSS
+{% endcomment %}
+{% load markdown %}
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>{{ title|default:"Docs" }}</title>
+
+        <style>
+          body {
+            background: #222;
+            font-family: sans-serif;
+            color: #ddd;
+          }
+
+          main {
+            max-width: 1080px;
+            margin: 0 auto;
+            /*white-space: pre-wrap;*/
+          }
+        </style>
+
+        {% block head.extra %}{% endblock head.extra %}
+    </head>
+
+    <body>
+    {% block body %}
+        <main class='{% if is_rendered %}html{% else %}markdown{% endif %}'>{% block body.main %}
+            <p>base file 'body.main' block</p>
+        {% endblock body.main %}</main>
+    {% endblock body %}
+    </body>
+</html>
