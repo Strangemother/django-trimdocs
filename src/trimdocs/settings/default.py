@@ -24,4 +24,7 @@ TRIMDOCS_DEST_DOCS = None
 
 INPUT_ENCODING = "utf-8"
 OUTPUT_ENCODING = "utf-8"
+
+# file types to discover when scanning for assets.
 DISCOVER_PATTERNS = ("*.md", )
+DIR_FILE_EXTENSIONS = (".md", )

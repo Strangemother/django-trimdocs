@@ -2,11 +2,21 @@
 {% else %}{{ object_path_info }}{% endif %}
 ---
 
+# Indicies
+
+This is a _special_ file to list the index content of the pages below.
+
+---
+
 {% if index_filename_info.given_relative  %}{% include index_filename_info.given_absolute_str %}{% else %}{{ object_path_info }}{% endif %}
 
-> Directory `{{ object_path_info.given_relative }}/`
+> Indicies `{{ object_path_info.given_relative }}/`
 
-This template presents a directory from the srcdocs - This should present the markdown readme of the directory.
+
+{% if not index_filename_info.given_relative %}
+An existing _indicies_ file does not exist. A default one is applied.
+{% endif %}
+---
 
 {% include "./object_info.md" %}
 

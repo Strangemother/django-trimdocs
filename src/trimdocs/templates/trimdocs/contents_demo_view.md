@@ -2,18 +2,27 @@
 {% else %}{{ object_path_info }}{% endif %}
 ---
 
+# Contents
+
+This is a _special_ file to list the content of the pages below.
+
+---
+
 {% if index_filename_info.given_relative  %}{% include index_filename_info.given_absolute_str %}{% else %}{{ object_path_info }}{% endif %}
 
-> Directory `{{ object_path_info.given_relative }}/`
+> Content `{{ object_path_info.given_relative }}/`
 
-This template presents a directory from the srcdocs - This should present the markdown readme of the directory.
+
+{% if not index_filename_info.given_relative %}
+An existing _contents_ file does not exist. A default one is applied.
+{% endif %}
+---
 
 {% include "./object_info.md" %}
 
 > Found File: `{{ index_filename_info.given_relative }}`
 
 {% include "./object_info.md" with object_path_info=index_filename_info %}
-
 
 {{ object_list|length }} children
 

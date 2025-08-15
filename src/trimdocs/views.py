@@ -117,11 +117,15 @@ def get_directory_list(path_info):
 
 
 class PathBaseListView(views.ListView):
-    """Present a file
+    """A Base for listing a _Path_ as a directory.
 
         localhost:8000/trimdocs/path/readme.md/?frame=base&html_render=True
+
+    Importantly, the queryset isn't models (yet)
+
     """
     template_name = 'trimdocs/path_view.html'
+    inner_markdown_template = './source_demo_view.md'
 
     def get_queryset(self):
         """
@@ -160,17 +164,26 @@ class PathBaseListView(views.ListView):
         }
 
     def get_param_options(self):
+        """Return a dict of _options_ for the view. They include the
+        frame and _if should render_ HTML.
+        """
         g = self.request.GET.copy()
         g.setdefault('frame', 'minimal')
         g.setdefault('html_render', 'true')
         return g
 
     def get_frame_name(self):
+        """REturn the name of the page frame from the GET or default options.
+        """
         opts = self.get_param_options()
         frame = opts.get('frame', 'base')
         return FRAME_MAP.get(frame)
 
     def get_html_render(self):
+        """Return a bool if the html render is flagged.
+        True will render the content as html
+        False will present the markdown, but with the jinja tags replaced.
+        """
         opts = self.get_param_options()
         return len(opts.get('html_render', '')) > 0
 
@@ -182,7 +195,7 @@ class PathBaseListView(views.ListView):
         r['html_render'] = self.get_html_render()
         r['is_rendered'] = self.get_html_render()
         # r['trimdocs_global_frame'] = "trimdocs/base.html"
-        r['primary_include_filename'] = './source_demo_view.md'
+        r['primary_include_filename'] = self.inner_markdown_template
         r['trimdocs_global_frame'] = self.get_frame_name()
         # r['trimdocs_global_frame'] = "trimdocs/base/null.html"
         r['object_content'] = self.get_object_content(p)
@@ -205,7 +218,17 @@ class PathBaseListView(views.ListView):
 
 
 class PathView(PathBaseListView):
+    """The primary entry for browser based viewing of files
 
+        /path/foo/bar/baz.md
+
+    This acts as a (hidden) redirect to prepared views.
+    For example if the given path is a directory or _special file_, serve their
+    response.
+    Default to the natural request, serving a placeholder file.
+
+    This is the same view used for `compile`.
+    """
     def get(self, request, *args, **kwargs):
         """A few options exist here.
 
@@ -219,56 +242,126 @@ class PathView(PathBaseListView):
         # if path == dir: show dir page.
         ppath = self.get_path_info
         filepath = ppath['given_absolute']
-
-        view_name = None
-
-        if filepath.is_dir():
-            print('is DIR')
-            view_name = 'trimdocs:dir'
-
-        if filepath.stem.lower() == 'readme':
-            print('readme file')
+        view_name = self.get_view_name(filepath)
 
         if view_name:
-            resolve_match = resolve(reverse(view_name, args=args))
-            view_class = resolve_match.func.view_class
-            initkwargs = resolve_match.func.view_initkwargs
-            view_class.view_initkwargs = initkwargs
-
-            instance = view_class(**initkwargs)
-            instance.setup(request, *args, **kwargs)
-            return instance.get(request, *args, **kwargs)
+            return self.subview_get(view_name, request, *args, **kwargs)
 
         res = super().get(request, *args, **kwargs)
         return res
 
+    def subview_get(self, view_name, request, *args, **kwargs):
+        """Given a view name and the original request parameters,
+        return the get() response of the _other_ class.
+
+        This overrides the original rendering to present this inner view.
+        Fundamentally like a redirect, but with a shadowed URL.
+        """
+        resolve_match = resolve(reverse(view_name, args=args))
+        view_class = resolve_match.func.view_class
+        initkwargs = resolve_match.func.view_initkwargs
+        view_class.view_initkwargs = initkwargs
+
+        instance = view_class(**initkwargs)
+        instance.setup(request, *args, **kwargs)
+        return instance.get(request, *args, **kwargs)
+
+    def get_view_name(self, filepath):
+        """Return the target viewname to render.
+        If None is returned, the default view (this one) is rendered.
+        """
+        view_name = None
+        if filepath.is_dir():
+            print('is DIR')
+            view_name = 'trimdocs:dir'
+
+        stem = filepath.stem.lower()
+
+        if stem == 'readme':
+            print('readme file')
+        if stem == '_indicies':
+            print('indicies file')
+            view_name = 'trimdocs:indicies'
+        if stem == '_contents':
+            print('contents file')
+            view_name = 'trimdocs:contents'
+
+        return view_name
+
 
 class PathDirView(PathBaseListView):
+    """A Directory view Lists its children, and has a primary
+    file, one of the specials; hopefully a README.
+
+    The object will be the current _directory_, where the `index_filename_info`
+    is the index file.
+    """
     template_name = 'trimdocs/dir_view.html'
+    inner_markdown_template = './dir_demo_view.md'
+    special_names = (
+            "readme",
+            "contents",
+            "indicies",
+        )
+
+    def get_special_names(self):
+        return self.special_names
 
     def get_directory_index_filename(self, **kwargs):
         """Find the first preferred file from a directory:
         """
-        names = (
-                "readme.md",
-                "contents.md",
-                "index.md",
-                "_readme.md",
-                "_index.md",
-                "_contents.md",
-            )
+        names = self.get_special_names()
+        # names = (
+        #         "readme.md",
+        #         "contents.md",
+        #         "indicies.md",
+        #         "_readme.md",
+        #         "_indicies.md",
+        #         "_contents.md",
+        #     )
+        discover_patterns = settings.DIR_FILE_EXTENSIONS
         # get this dir, for each.
         path_info = self.get_path_info
         loc = path_info['given_absolute']
         for name in names:
-            p = loc / name
-            if p.exists():
-                return p
+            for ext in discover_patterns:
+                p = (loc / name).with_suffix(ext)
+                if p.exists():
+                    return p
+        # Seach for the name in underscore
+        for name in names:
+            for ext in discover_patterns:
+                p = (loc / f"_{name}").with_suffix(ext)
+                if p.exists():
+                    return p
 
     def get_context_data(self, **kwargs):
         r = super().get_context_data(**kwargs)
         fn = self.get_directory_index_filename()
         if fn:
             r['index_filename_info'] = self.get_relative_path_info(fn)
-        r['primary_include_filename'] = './dir_demo_view.md'
+        r['primary_include_filename'] = self.inner_markdown_template
         return r
+
+
+class IndiciesPathView(PathDirView):
+    """An _indicies presents all files below as a flat list of urls.
+
+    This is a _special view_ served on `trimdocs:indices`
+    """
+    inner_markdown_template = './indicies_demo_view.md'
+    special_names = (
+            "indicies",
+            )
+
+
+class ContentsPathView(PathDirView):
+    """An `_contents` of any directory presents its children with titles and
+    descriptions
+
+    This is a _special view_ served on `trimdocs:contents`
+    """
+    inner_markdown_template = './contents_demo_view.md'
+    special_names = (
+            "contents",
+            )
