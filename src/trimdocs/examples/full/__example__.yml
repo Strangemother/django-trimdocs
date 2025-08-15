@@ -1,0 +1,6 @@
+flavor: full
+version: 1
+requires_tags:
+  - toc
+  - image
+  - code

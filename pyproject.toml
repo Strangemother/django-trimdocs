@@ -23,6 +23,11 @@ dependencies = [
   "Jinja2>=3.1",
 ]
 
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "trimdocs.settings.default"
+# -- recommended but optional:
+python_files = ["test_*.py", "*_test.py", "tests/python/*.py"]
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8",
@@ -35,6 +40,7 @@ trimdocs = "trimdocs.cli:main"
 [tool.setuptools.package-data]
 trimdocs = [
   "templates/**/*.html",
+  "examples/**/*",
 ]
 
 [tool.setuptools]

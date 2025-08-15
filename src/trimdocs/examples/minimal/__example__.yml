@@ -1,0 +1,5 @@
+flavor: minimal
+version: 1
+requires_tags:
+  - toc
+  - include
