@@ -1,3 +1,19 @@
+"""
+TrimDocs CLI for compiling documentation.
+
+This script provides a command-line interface to compile documentation
+Currently we have a single command:
+
++ Compile: convert source documentation to a specified format and destination.
+
+But in the future, we can add more commands:
+
++ serve: start a local server to view documentation.
++ clean: remove compiled documentation.
++ init: initialize a new documentation project.
++ validate: check the integrity of the documentation source files.
+
+"""
 from __future__ import annotations
 
 import argparse

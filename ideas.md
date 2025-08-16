@@ -303,3 +303,12 @@ Functional lists and stacks
 many outputs
 
 + convert to github, hugo, html, browser - at once.
+
+---
+
+File injection
+
+At times I may want to inject files into the output, e.g. a file with a list of links, or a new page dedicated to asset presentation (e.g. a fullpage image.)
+
+Under the hood, this will add a new _path_ to the compilation set, A unique view captures and renders (as expected). This ensures a user doesn't need to use alternative tags.
+
