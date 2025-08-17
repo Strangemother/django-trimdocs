@@ -117,6 +117,40 @@ Serving all platforms.
 
 A relative image page insert
 
+the iamge tag should allow the import of an image from a file
+
+This builds a link relative in the srcdocs, and copies the image to the destdocs
+
+    {% image "./local/path/logo.png" %}
+    ![logo](./local/path/logo.png)
+
+Rename the image or dest on output
+
+    {% image "./local/path/logo.png" "./assets/img/logo.png" %}
+    ![logo](./assets/img/logo.png)
+
+    {% image "./local/path/logo.png" "./imgs" %}
+    ![logo](./imga/logo.png)
+
+We also want renaming and file resize
+
+    {% image "./local/path/logo.png" "./imgs" width=400 %}
+    ![logo](./imgs/logo-400.png)
+
+Relative file location needs to know the current file dest
+
+    # file /docs/bill/and/teds/excellent/adventure.md
+    # IMAGES_DEST = '/docs/imgs/'
+
+    {% image "./logo.png" IMAGES_DEST %}
+    ![logo](../../../../imgs/logo.png)
+
+
+---
+
+run return as html or md `image.html`, `image.md` is the same as `image`
+
+
 ### {% toc . depth=3 %}
 
 A TOC of a file or directory

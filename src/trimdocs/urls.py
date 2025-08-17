@@ -10,7 +10,6 @@ By default the django trimdocs is configured to look for a DOCS url.
 """
 from django.urls import include, path, re_path
 
-from docs import views
 from trim import urls
 
 from . import views

@@ -21,8 +21,8 @@ class Command(BaseCommand):
             # compile ---------------------------------------------------------
             parser_compile = subparsers.add_parser('compile', help='compile help')
             parser_compile.set_defaults(func=self.handle_compile_docs)
-            parser_compile.add_argument("--srcdocs", nargs="?", default=settings.TRIMDOCS_SRC_DOCS)
-            parser_compile.add_argument("--destdocs", nargs="?", default=settings.TRIMDOCS_DEST_DOCS)
+            parser_compile.add_argument("--srcdocs", nargs="?", type=Path, default=settings.TRIMDOCS_SRC_DOCS)
+            parser_compile.add_argument("--destdocs", nargs="?", type=Path, default=settings.TRIMDOCS_DEST_DOCS)
             parser_compile.add_argument("--create-destdocs", action='store_true', default=False)
             parser_compile.add_argument("--dry-run", action='store_true', default=False)
 
@@ -49,7 +49,8 @@ class Command(BaseCommand):
         options.setdefault('srcdocs', settings.TRIMDOCS_SRC_DOCS)
         options.setdefault('destdocs', settings.TRIMDOCS_DEST_DOCS)
 
-        assert options['srcdocs'].exists(), 'srcdocs does not exist'
+
+        assert options['srcdocs'].exists(), f"srcdocs does not exist, {options['srcdocs']}"
 
         dest_dir = options['destdocs']
         mk_dest_dir = options['create_destdocs']
@@ -93,13 +94,15 @@ class Command(BaseCommand):
         discover_patterns = settings.DISCOVER_PATTERNS
 
         keep = ()
+        skips = ()
         for pattern in discover_patterns:
             for src_file in src_dir.rglob(pattern):
                 count += 1
                 name = src_file.name
                 # And excludes?
-                if name.startswith('_'):
-                    print('Skip', src_file)
+                if any(x.name.startswith('_') for x in src_file.parents):
+                    print('x Skip', src_file)
+                    skips += (src_file,)
                     continue
                 keep += (src_file, )
                 prefix = '  '

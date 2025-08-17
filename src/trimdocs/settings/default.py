@@ -19,8 +19,24 @@ So build a complex relative, and absolute it:
 # templates/...
 # TRIMDOCS_SRC_DOCS = 'trimdocs/srcdocs/'
 
+# example for your settings.py
+"""
+from trimdocs.settings.default import *
+SITE_DIR = (Path(__file__).parent / '../../../../').resolve().absolute()
+# one more step out of site to root
+ROOT = (SITE_DIR.parent / '../').resolve().absolute()
+
+TRIMDOCS_SRC_DOCS = SITE_DIR / 'demo-srcdocs/'
+TRIMDOCS_DEST_DOCS = ROOT / "docs/"
+TRIMDOCS_README_SRCFILE = TRIMDOCS_SRC_DOCS / 'SRC_README.md'
+TRIMDOCS_README_DESTFILE = ROOT / 'README.md'
+
+"""
+
 # No dest supplied will expect a an explicit dest when compiling.
 TRIMDOCS_DEST_DOCS = None
+TRIMDOCS_README_SRCFILE = None
+TRIMDOCS_README_DESTFILE = None
 
 INPUT_ENCODING = "utf-8"
 OUTPUT_ENCODING = "utf-8"

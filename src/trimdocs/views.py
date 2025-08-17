@@ -116,6 +116,42 @@ def get_directory_list(path_info):
     return res
 
 
+class Paren:
+    """The Parens is latin for Parent. This Parens Path object allows the
+    inspection of a Path (only ever) in relative to the parent.
+
+    This ensures a path is landlocked to a source, and we can derive relative
+    paths with ease.
+    """
+    def __init__(self, root_path, child_path=''):
+        self.root_path = Path(root_path)
+        self.child_path = Path(child_path)
+
+    def get_resolved(self):
+        return (self.root_path / self.child_path).resolve()
+
+    def exists(self):
+        return self.path.exists()
+
+    @property
+    def abs(self):
+        """Return the absolute path of the root and child.
+        """
+        return self.get_resolved().absolute()
+
+    @property
+    def rel(self):
+        return self.get_resolved().relative_to(self.root_path)
+
+    @property
+    def path(self):
+        return self.get_resolved()
+
+    @property
+    def src(self):
+        return self.root_path.resolve()
+
+
 class PathBaseListView(views.ListView):
     """A Base for listing a _Path_ as a directory.
 
@@ -191,6 +227,11 @@ class PathBaseListView(views.ListView):
         r = super().get_context_data(**kwargs)
         p = self.get_path_info
         r['object_path_info'] = p
+
+        srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+        path = self.kwargs.get('path', '')
+        r['parenpath'] = Paren(srcdocs_path, path)
+
         r['object_path'] = p['path']
         r['html_render'] = self.get_html_render()
         r['is_rendered'] = self.get_html_render()
@@ -280,10 +321,10 @@ class PathView(PathBaseListView):
         if stem == 'readme':
             print('readme file')
         if stem == '_indicies':
-            print('indicies file')
+            # print('indicies file')
             view_name = 'trimdocs:indicies'
         if stem == '_contents':
-            print('contents file')
+            # print('contents file')
             view_name = 'trimdocs:contents'
 
         return view_name

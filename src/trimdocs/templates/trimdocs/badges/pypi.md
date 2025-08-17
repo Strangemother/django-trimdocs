@@ -1,0 +1,5 @@
+[![Upload Python Package](https://github.com/Strangemother/django-trim/actions/workflows/python-publish.yml/badge.svg)](https://github.com/Strangemother/django-trim/actions/workflows/python-publish.yml)
+![PyPI](https://img.shields.io/pypi/v/django-trim?label=django-trim)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/django-trim)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/django-trim)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)

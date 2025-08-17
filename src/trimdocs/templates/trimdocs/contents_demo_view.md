@@ -1,3 +1,4 @@
+{% trimdocs.breadcrumbs %}
 {% if object_path_info.given_relative  %}{% if object_path_info.given_absolute.is_file %}{% include object_path_info.given_relative_str %}{% endif %}
 {% else %}{{ object_path_info }}{% endif %}
 ---
@@ -25,8 +26,3 @@ An existing _contents_ file does not exist. A default one is applied.
 {% include "./object_info.md" with object_path_info=index_filename_info %}
 
 {{ object_list|length }} children
-
-{% for unit in object_list %}
-+ [{{ unit.name }}{% if unit.is_dir %}/{% endif %}]({{unit.rel_path}})
-    Unit: {{ unit }}
-{% endfor %}
