@@ -6,6 +6,16 @@
     e.g. a reference should correctly apply relative linking `../../../foo/bar/`
 + The end result is always invsible; A person may not be aware the pre-processing step occurred.
 
+---
+
+Inline test:
+
++ One
+    +  One
+    +  Two
++ Two
++ Three
+
 ## Concept
 
 A developer should be able to apply a range of small elements to build a nice Docs and its subset.
@@ -345,4 +355,5 @@ File injection
 At times I may want to inject files into the output, e.g. a file with a list of links, or a new page dedicated to asset presentation (e.g. a fullpage image.)
 
 Under the hood, this will add a new _path_ to the compilation set, A unique view captures and renders (as expected). This ensures a user doesn't need to use alternative tags.
+
 
