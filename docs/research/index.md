@@ -346,3 +346,27 @@ At times I may want to inject files into the output, e.g. a file with a list of 
 
 Under the hood, this will add a new _path_ to the compilation set, A unique view captures and renders (as expected). This ensures a user doesn't need to use alternative tags.
 
+---
+
+### Model Backed
+
+Pure files is fine, but we can back the files using models to make the rendering amazing.
+
+A _Page_ model can be gathered at runtime, pushed into the table and iterated like normal models. Using a memory sqlite database (and an init-db cloner... from celeste-os)
+
+A model can then:
+
++ contain slug
++ origin file, dest file
++ parents list
++ tags and markdown meta data
++ md init text.
+
+When compiling, or reading the file structure we perform a bulk update for all pages.
+Job done.
+
+---
+
+### Flat file
+
+Convert the entire source into a single flat file, indexed by folder depth
