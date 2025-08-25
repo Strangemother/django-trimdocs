@@ -4,6 +4,10 @@ from runpy import run_path
 from pathlib import Path
 import os
 
+
+from django.core import management
+from django.core.management.commands import migrate
+
 class Command(RunserverCommand):
 
     def add_arguments(self, parser):
@@ -19,9 +23,10 @@ class Command(RunserverCommand):
         )
         super().add_arguments(parser)
 
-    # def on_bind(self, server_port):
-    #     # print('Bound to port', server_port)
-    #     super().on_bind(server_port)
+    def on_bind(self, server_port):
+        print('\n\nBound to port', server_port)
+        # management.call_command(migrate.Command(), verbosity=3)
+        super().on_bind(server_port)
 
     # def inner_run(self, *args, **options):
     def run(self, *args, **options):
@@ -36,4 +41,5 @@ class Command(RunserverCommand):
             os.environ["TRIMDOCS_SETTNGS_FILE"] = str(filepath.absolute())
             print('loaded', settings.keys())
         # super().inner_run(*args, **options)
+
         super().run(*args, **options)

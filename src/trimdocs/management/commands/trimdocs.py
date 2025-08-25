@@ -1,54 +1,73 @@
 from __future__ import annotations
 
+import os
 from pprint import pprint as pp
-
 from pathlib import Path
 from typing import Optional
 
 from django.urls import resolve, reverse
-
 from django.core.management.base import BaseCommand
 
 from trimdocs.conf import get_settings
+from trim.models import live
+from trimdocs import utils
 from django.conf import settings
+
 
 class Command(BaseCommand):
     help = "Compile docs: partial Markdown -> Markdown/HTML with optional frame"
 
     def add_arguments(self, parser):
-            subparsers = parser.add_subparsers(title="action")
 
-            # compile ---------------------------------------------------------
-            parser_compile = subparsers.add_parser('compile', help='compile help')
-            parser_compile.set_defaults(func=self.handle_compile_docs)
-            parser_compile.add_argument("--srcdocs", nargs="?", type=Path, default=settings.TRIMDOCS_SRC_DOCS)
-            parser_compile.add_argument("--destdocs", nargs="?", type=Path, default=settings.TRIMDOCS_DEST_DOCS)
-            parser_compile.add_argument("--create-destdocs", action='store_true', default=False)
-            parser_compile.add_argument("--dry-run", action='store_true', default=False)
-
-            # scaffold --------------------------------------------------------
-            parser_scaffold = subparsers.add_parser('scaffold', help='copy packaged example docs to a destination directory')
-            parser_scaffold.set_defaults(func=self.handle_scaffold)
-            parser_scaffold.add_argument('--flavor', choices=('minimal', 'full'), default='minimal')
-            parser_scaffold.add_argument('destination', nargs='?', default='srcdocs')
-            parser_scaffold.add_argument('--force', action='store_true', default=False, help='overwrite existing files')
+        subparsers = parser.add_subparsers(title="action")
+        # compile ---------------------------------------------------------
+        parser_compile = subparsers.add_parser('compile', help='compile help')
+        parser_compile.set_defaults(func=self.handle_compile_docs)
+        parser_compile.add_argument("--srcdocs", nargs="?", type=Path, default=settings.TRIMDOCS_SRC_DOCS)
+        parser_compile.add_argument("--destdocs", nargs="?", type=Path, default=settings.TRIMDOCS_DEST_DOCS)
+        parser_compile.add_argument("--create-destdocs", action='store_true', default=False)
+        parser_compile.add_argument("--dry-run", action='store_true', default=False)
 
     def handle(self, *args, **options):
         action = options["func"]
         if action:
             return action(*args, **options)
-        print('No action found.')
+        self._out_log('No action found.')
 
-    def _out_success(self, pr_str):
-        self.stdout.write(self.style.SUCCESS(pr_str))
+    def _out_success(self, *pr_str):
+        self.stdout.write(self.style.SUCCESS(' '.join(pr_str)))
+
+    def _out_log(self, *pr_str):
+        """
+        ERROR,
+        ERROR_OUTPUT,
+        HTTP_BAD_REQUEST,
+        HTTP_INFO,
+        HTTP_NOT_FOUND,
+        HTTP_NOT_MODIFIED,
+        HTTP_REDIRECT,
+        HTTP_SERVER_ERROR,
+        HTTP_SUCCESS,
+        MIGRATE_HEADING,
+        MIGRATE_LABEL,
+        NOTICE,
+        SQL_COLTYPE,
+        SQL_FIELD,
+        SQL_KEYWORD,
+        SQL_TABLE,
+        SUCCESS,
+        WARNING
+        """
+        self.stdout.write(' '.join(map(str, pr_str)))
 
     def handle_compile_docs(self, *args, **options):
 
         self._out_success(f"trimdocs compile")
 
-        options.setdefault('srcdocs', settings.TRIMDOCS_SRC_DOCS)
-        options.setdefault('destdocs', settings.TRIMDOCS_DEST_DOCS)
+        # options.setdefault('srcdocs', settings.TRIMDOCS_SRC_DOCS)
+        # options.setdefault('destdocs', settings.TRIMDOCS_DEST_DOCS)
 
+        options['srcdocs'] = options['srcdocs'].absolute()
 
         assert options['srcdocs'].exists(), f"srcdocs does not exist, {options['srcdocs']}"
 
@@ -56,12 +75,12 @@ class Command(BaseCommand):
         mk_dest_dir = options['create_destdocs']
         if dest_dir.exists() is False:
             if mk_dest_dir is False:
-                assert dest_dir.exists(), 'destdocs does not exist'
+                assert dest_dir.exists(), f'destdocs does not exist: {dest_dir}'
             else:
-                print(f'making dest directory, {dest_dir}')
+                self._out_log(f'making dest directory, {dest_dir}')
                 dest_dir.mkdir(parents=True, exist_ok=True)
         else:
-            print('Destination exists', dest_dir)
+            self._out_log('Destination exists', dest_dir)
 
         assert dest_dir.exists(), 'destdocs does not exist'
 
@@ -73,48 +92,13 @@ class Command(BaseCommand):
         """
         src_dir = options['srcdocs']
 
-        print('')
-        print('running compilation of: ')
-        print('    src_dir', src_dir)
-        # For now, create the destination directory and copy .md files verbatim
-        count = 0
-        """For every file in the srcdocs, create the sibling in the destination.
-        Functionality this is a copy/paste - but through a markdown renderer view.
-
-        For each file, call to the path view renderer, render the text and write
-        it to the destination.
-
-        However, writing needs to be cached, so we can perform any
-        cross-referencing later. This may be memory intensive, so a flag for
-        _write now_ should be appliable.
-        """
-
-        print('')
-
         discover_patterns = settings.DISCOVER_PATTERNS
+        keep, skips, count = utils.gather_files(src_dir, discover_patterns, 1)
 
-        keep = ()
-        skips = ()
-        for pattern in discover_patterns:
-            for src_file in src_dir.rglob(pattern):
-                count += 1
-                name = src_file.name
-                # And excludes?
-                if any(x.name.startswith('_') for x in src_file.parents):
-                    print('x Skip', src_file)
-                    skips += (src_file,)
-                    continue
-                keep += (src_file, )
-                prefix = '  '
-                if name == 'readme.md':
-                    prefix = ' *'
-                rel = src_file.relative_to(src_dir)
-                print(f"{prefix}{rel}")
-
-        print('')
-        pp(options)
-        print('\n')
-
+        utils.scrub()
+        self._out_log('count', live.trimdocs.PageModel.objects.all().count())
+        utils.populate(keep, src_dir)
+        self._out_log('count', live.trimdocs.PageModel.objects.all().count())
         """Populate missing files
 
         index, incidies, content etc..
@@ -125,80 +109,46 @@ class Command(BaseCommand):
         return self.render_assets(options, keep)
         # return self.duplicate_assets(options, keep)
 
-    # ------------------------------------------------------------------
-    # Scaffold
-    # ------------------------------------------------------------------
-    def handle_scaffold(self, *args, **options):
-        """Copy the packaged example docs tree to a destination.
-
-        This lets users quickly bootstrap a docs directory.
-        """
-        from trimdocs import get_example_path
-        import shutil
-
-        flavor = options['flavor']
-        dest = Path(options['destination'])
-        src = get_example_path(flavor)
-        if not src.exists():
-            self.stderr.write(self.style.ERROR(f"Example flavor not found: {flavor}"))
-            return 1
-        if dest.exists() and any(dest.iterdir()) and not options['force']:
-            self.stderr.write(self.style.ERROR(f"Destination {dest} exists and is not empty (use --force)."))
-            return 1
-        dest.mkdir(parents=True, exist_ok=True)
-        # Copy tree (shutil.copytree requires non-existing dst; do manual walk)
-        for path in src.rglob('*'):
-            rel = path.relative_to(src)
-            outp = dest / rel
-            if path.is_dir():
-                outp.mkdir(parents=True, exist_ok=True)
-                continue
-            if outp.exists() and not options['force']:
-                continue
-            outp.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, outp)
-        self._out_success(f"Scaffolded '{flavor}' example into {dest}")
-        return 0
-
     def render_assets(self, options, keep):
         dest_dir = options['destdocs']
         src_dir = options['srcdocs']
         input_encoding = settings.INPUT_ENCODING
         output_encoding = settings.OUTPUT_ENCODING
 
-        print('    dest_dir', dest_dir)
+        self._out_log('    dest_dir', dest_dir)
 
         dry_run = options.get('dry_run', True)
 
         if dry_run:
-            print('\n == Dry Run (will not write the result). == \n')
+            self._out_log('\n == Dry Run (will not write the result). == \n')
 
-        print('Writing files to', dest_dir)
+        self._out_log('Writing files to', dest_dir)
 
         made = ()
         max_width = 20
         # Now a _copy_ - but through a picked renderer.
         for src_file in keep:
-            rel = src_file.relative_to(src_dir)
+            # rel = src_file.relative_to(src_dir)
+            rel = src_file.absolute().relative_to(src_dir.absolute())
             outp = dest_dir / rel
             if outp.parent.exists() is False:
                 if dry_run is False:
-                    print('Making destination', outp.parent)
+                    self._out_log('Making destination', outp.parent)
                     outp.parent.mkdir(parents=True, exist_ok=True)
                 else:
                     # we pretend it got made.
                     pass
 
-            str_rel_src_path = str(src_file.relative_to(src_dir))
+            str_rel_src_path = str(src_file.relative_to(src_dir).as_posix())
             max_width = max(max_width, len(str_rel_src_path)+2)
 
-            print(f'  {str_rel_src_path:<{max_width}} => ', outp.relative_to(dest_dir))
+            self._out_log(f'  {str_rel_src_path:<{max_width}} => ', outp.relative_to(dest_dir))
 
             # render the view, by resolving the trimdocs:path
             view_name = 'trimdocs:path'
             view_args = (str_rel_src_path, )
             kwargs = {
-                "path":  str_rel_src_path
+                "path":  Path(str_rel_src_path).as_posix()
             }
 
             """
@@ -224,7 +174,7 @@ class Command(BaseCommand):
 
             instance = view_class(**initkwargs)
             instance.setup(request, *view_args, **kwargs)
-
+            # self._out_log('Requesting', view_args, kwargs)
             template_response = instance.get(request)
             rendered = template_response.render()
 
@@ -264,14 +214,14 @@ class Command(BaseCommand):
         input_encoding = settings.INPUT_ENCODING
         output_encoding = settings.OUTPUT_ENCODING
 
-        print('    dest_dir', dest_dir)
+        self._out_log('    dest_dir', dest_dir)
 
         dry_run = options.get('dry_run', True)
 
         if dry_run:
-            print('\n == Dry Run (will not write the result). == \n')
+            self._out_log('\n == Dry Run (will not write the result). == \n')
 
-        print('Writing files to', dest_dir)
+        self._out_log('Writing files to', dest_dir)
 
         made = ()
         max_width = 20
@@ -281,7 +231,7 @@ class Command(BaseCommand):
             outp = dest_dir / rel
             if outp.parent.exists() is False:
                 if dry_run is False:
-                    print('Making destination', outp.parent)
+                    self._out_log('Making destination', outp.parent)
                     outp.parent.mkdir(parents=True, exist_ok=True)
                 else:
                     # we pretend it got made.
@@ -290,7 +240,7 @@ class Command(BaseCommand):
             str_rel_src_path = str(src_file.relative_to(src_dir))
             max_width = max(max_width, len(str_rel_src_path)+2)
 
-            print(f'  {str_rel_src_path:<{max_width}} => ', outp.relative_to(dest_dir))
+            self._out_log(f'  {str_rel_src_path:<{max_width}} => ', outp.relative_to(dest_dir))
             if dry_run is False:
                 outp.write_text(src_file.read_text(encoding=input_encoding),
                                 encoding=output_encoding)
@@ -307,4 +257,9 @@ class Command(BaseCommand):
     def configure_compile_options(self, *args, **options):
         """Add any object configurations used to compile, such as root definitions
         """
+        project = live.trimdocs.Project.objects.get_or_create(
+                run_dir=os.getcwd(),
+                src_dir=options['srcdocs'],
+            )
+        self._out_log(f'{project=}')
         return options

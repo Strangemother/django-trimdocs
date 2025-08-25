@@ -1,0 +1,2 @@
+{% for token in toc_tokens %}+ [{{ token.html|safe }}](#{{ token.id }})
+{% include "trimdocs/templatetags/toc_tokens.html" with items=token.children %}{% endfor %}

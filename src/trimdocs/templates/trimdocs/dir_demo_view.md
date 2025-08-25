@@ -34,8 +34,8 @@ No index file.
 {% endblock source.footer %}
 
 {% block source.childlist %}
-{{ object_list|length }} dir children
+{{ object_list|length }} dir child{{ object_list|pluralize:',ren' }}
 
-{% for unit in object_list %}+ [{{ unit.name }}{% if unit.is_dir %}/{% endif %}]({{unit.rel_path}}): Unit: {{ unit }}
+{% for unit in object_list %}+ {% link.rel unit.rel_path %}{% if unit.is_dir %}/{% endif %}
 {% endfor %}
 {% endblock source.childlist %}

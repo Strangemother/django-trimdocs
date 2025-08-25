@@ -7,5 +7,8 @@
         http://localhost:8000/trimdocs/file/foo/bar.md
         # path = foo/bar.md
 
+{% block body.main %}
+{{ primary_include_filename }}
+{% endblock body.main %}
 {% endcomment %}
 {% load markdown %}{% block body.main %}{% if html_render %}{% markdown %}{% include primary_include_filename %}{% endmarkdown %}{% else %}{% include primary_include_filename %}{% endif %}{% endblock body.main %}

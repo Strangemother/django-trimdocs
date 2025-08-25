@@ -1,0 +1,2 @@
+{% load toc %}{% for token in items %}{% spaces token.level start %}+ [{{ token.html|safe }}](#{{token.id}})
+{% if token.children %}{% include "trimdocs/templatetags/toc_tokens.html" with items=token.children %}{% endif %}{% endfor %}

@@ -5,8 +5,21 @@ from django.shortcuts import redirect
 from django.conf import settings
 from django.utils.functional import cached_property
 from django.urls import resolve, reverse
+from django.http import Http404
+
+
+from django.core import management
+
+try:
+    import markdown as markdown_orig
+except ImportError:
+    markdown_orig = None
 
 from trim import views
+
+from . import nulldown
+from . import models
+from . import forms
 
 
 FRAME_MAP = {
@@ -15,6 +28,13 @@ FRAME_MAP = {
     'null': "trimdocs/base/null.html"
 }
 
+MARKDOWN_EXTENSIONS=[
+    'meta',
+    # 'extra',
+    'toc',
+    'pymdownx.details',
+    "pymdownx.extra",
+]
 
 class ExampleIndexTemplateView(views.TemplateView):
     template_name = 'trimdocs/example_index.html'
@@ -43,7 +63,6 @@ class ExampleIndexTemplateView(views.TemplateView):
 
         # Pre-configured install page with example.
         return redirect('trimdocs:trimdocs_suppliments')
-
 
 
 class TrimdocsSupplimentsIndexTemplateView(views.TemplateView):
@@ -152,7 +171,35 @@ class Paren:
         return self.root_path.resolve()
 
 
-class PathBaseListView(views.ListView):
+class FrameMixin:
+    def get_frame_name(self):
+        """REturn the name of the page frame from the GET or default options.
+        """
+        opts = self.get_param_options()
+        frame = opts.get('frame', 'base')
+        return FRAME_MAP.get(frame)
+
+    def get_html_render(self):
+        """Return a bool if the html render is flagged.
+        True will render the content as html
+        False will present the markdown, but with the jinja tags replaced.
+        """
+        opts = self.get_param_options()
+        return len(opts.get('html_render', '')) > 0
+
+    def get_param_options(self):
+        """Return a dict of _options_ for the view. They include the
+        frame and _if should render_ HTML.
+        """
+        g = self.request.GET.copy()
+        g.setdefault('frame', 'minimal')
+        g.setdefault('html_render', 'true')
+        if hasattr(self, 'view_initkwargs'):
+            g.update(self.view_initkwargs)
+        return g
+
+
+class PathBaseListView(views.ListView, FrameMixin):
     """A Base for listing a _Path_ as a directory.
 
         localhost:8000/trimdocs/path/readme.md/?frame=base&html_render=True
@@ -175,7 +222,6 @@ class PathBaseListView(views.ListView):
 
     @cached_property
     def get_path_info(self):
-
         path = self.kwargs.get('path', '')
         return self.get_relative_path_info(path)
 
@@ -199,29 +245,6 @@ class PathBaseListView(views.ListView):
             'srcdocs_path': srcdocs_path,
         }
 
-    def get_param_options(self):
-        """Return a dict of _options_ for the view. They include the
-        frame and _if should render_ HTML.
-        """
-        g = self.request.GET.copy()
-        g.setdefault('frame', 'minimal')
-        g.setdefault('html_render', 'true')
-        return g
-
-    def get_frame_name(self):
-        """REturn the name of the page frame from the GET or default options.
-        """
-        opts = self.get_param_options()
-        frame = opts.get('frame', 'base')
-        return FRAME_MAP.get(frame)
-
-    def get_html_render(self):
-        """Return a bool if the html render is flagged.
-        True will render the content as html
-        False will present the markdown, but with the jinja tags replaced.
-        """
-        opts = self.get_param_options()
-        return len(opts.get('html_render', '')) > 0
 
     def get_context_data(self, **kwargs):
         r = super().get_context_data(**kwargs)
@@ -291,6 +314,16 @@ class PathView(PathBaseListView):
         res = super().get(request, *args, **kwargs)
         return res
 
+
+    def get_markdown_object(self):
+        # context['view']
+
+        # meta into the context.
+        # HTML is the raw
+        # https://python-markdown.github.io/extensions/
+        md = markdown_orig.Markdown(extensions=MARKDOWN_EXTENSIONS)
+        return md
+
     def subview_get(self, view_name, request, *args, **kwargs):
         """Given a view name and the original request parameters,
         return the get() response of the _other_ class.
@@ -298,14 +331,20 @@ class PathView(PathBaseListView):
         This overrides the original rendering to present this inner view.
         Fundamentally like a redirect, but with a shadowed URL.
         """
-        resolve_match = resolve(reverse(view_name, args=args))
+
+        resolve_match = resolve(reverse(view_name, args=args, kwargs=kwargs))
         view_class = resolve_match.func.view_class
         initkwargs = resolve_match.func.view_initkwargs
         view_class.view_initkwargs = initkwargs
-
+        # view_class.view_initkwargs.update(self.kwargs)
         instance = view_class(**initkwargs)
-        instance.setup(request, *args, **kwargs)
-        return instance.get(request, *args, **kwargs)
+        kw = kwargs.copy()
+        kw.update(self.kwargs)
+        instance.setup(request, *args, **kw)
+
+        res = instance.get(request, *args, **kw)
+
+        return res
 
     def get_view_name(self, filepath):
         """Return the target viewname to render.
@@ -315,6 +354,8 @@ class PathView(PathBaseListView):
         if filepath.is_dir():
             print('is DIR')
             view_name = 'trimdocs:dir'
+        else:
+            view_name = 'trimdocs:detail'
 
         stem = filepath.stem.lower()
 
@@ -330,20 +371,210 @@ class PathView(PathBaseListView):
         return view_name
 
 
-class PathDirView(PathBaseListView):
-    """A Directory view Lists its children, and has a primary
-    file, one of the specials; hopefully a README.
+class PageModel404View(views.TemplateView, FrameMixin):
+    template_name = 'trimdocs/path_view.html'
+    inner_markdown_template = './pagemodel_404.md'
 
-    The object will be the current _directory_, where the `index_filename_info`
-    is the index file.
-    """
-    template_name = 'trimdocs/dir_view.html'
-    inner_markdown_template = './dir_demo_view.md'
+    def get_context_data(self, **kwargs):
+        r = super().get_context_data(**kwargs)
+        # p = self.get_path_info
+        # r['object_path_info'] = p
+
+        srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+        path = self.kwargs.get('path', '')
+        r['parenpath'] = Paren(srcdocs_path, path)
+
+        # r['object_path'] = p['path']
+        r['html_render'] = self.get_html_render()
+        r['is_rendered'] = self.get_html_render()
+        # r['trimdocs_global_frame'] = "trimdocs/base/base.html"
+        r['primary_include_filename'] = self.inner_markdown_template
+        r['trimdocs_global_frame'] = self.get_frame_name()
+        return r
+
+
+class PageModelDetailView(views.DetailView, FrameMixin):
+    pk_url_kwarg = 'path'
+    slug_field = 'origin_path'
+    model = models.PageModel
+
+    template_name = 'trimdocs/path_view.html'
+    inner_markdown_template = './pagemodel_detail.md'
+
+    def get_context_data(self, **kwargs):
+        r = super().get_context_data(**kwargs)
+        p = self.get_path_info
+        r['object_path_info'] = p
+
+        srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+        path = self.kwargs.get('path', '')
+        r['parenpath'] = Paren(srcdocs_path, path)
+
+        # r['object_path'] = p['path']
+        r['html_render'] = self.get_html_render()
+        r['is_rendered'] = self.get_html_render()
+
+        # r['trimdocs_global_frame'] = "trimdocs/base.html"
+        r['primary_include_filename'] = self.inner_markdown_template
+        r['trimdocs_global_frame'] = self.get_frame_name()
+        metadata, clean_content = self.get_markdown_metadata(r['object'])
+        r['metadata'] = metadata
+        r['clean_content'] = clean_content
+        r['title'] = self.get_title(r)
+        # r['trimdocs_global_frame'] = "trimdocs/base/null.html"
+        # r['object_content'] = self.get_object_content(p)
+        return r
+
+    def get_title(self, context):
+        """Return the title from the meta data or the filename.
+        """
+        titles = context['metadata'].get('title')
+        if titles and len(titles) > 0:
+            title = titles[0]
+            return title
+
+        if 'object' in context:
+            obj = context['object']
+            name = obj.name
+        elif 'parenpath' in context:
+            parenpath = context['parenpath']
+            name = parenpath.rel.name
+
+        return Path(name).stem.replace('-', ' ').title()
+
+    def get_markdown_metadata(self, pagemodel):
+        filepath = pagemodel.as_path(full=True)
+        # meta into the context.
+        # HTML is the raw
+        # https://python-markdown.github.io/extensions/
+        extensions=[
+            'meta',
+        ]
+        # md = markdown_orig.Markdown(extensions=extensions)
+        md = nulldown.ReducedMarkdown(extensions=extensions)
+        content = filepath.read_text(encoding='ISO-8859-1')
+        html = md.convert(content)
+        metaless_content = '\n'.join(md.lines)
+        return md.Meta, metaless_content
+
+
+    def get_markdown_object(self):
+        # context['view']
+
+        # meta into the context.
+        # HTML is the raw
+        # https://python-markdown.github.io/extensions/
+        md = markdown_orig.Markdown(extensions=MARKDOWN_EXTENSIONS)
+        return md
+
+    def get(self, request, *args, **kwargs):
+        try:
+            self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+            return self.render_to_response(context)
+        except (self.model.DoesNotExist, Http404):
+            # If the file exists, then we can build this file
+            # on the fly.
+
+            # resolve_match = resolve(reverse(view_name, args=args, kwargs=kwargs))
+            view_class = PageModel404View
+            # view_class = resolve_match.func.view_class
+            # initkwargs = resolve_match.func.view_initkwargs
+            # view_class.view_initkwargs = initkwargs
+            kw = kwargs.copy()
+            kw.update(self.kwargs)
+            # view_class.view_initkwargs.update(kw)
+            instance = view_class(**kw)
+            instance.setup(request, *args, **kw)
+            return instance.get(request, *args, **kw)
+
+            # In response, we serve the other page.
+            # raise Exception('GET Custom Error')
+
+    @cached_property
+    def get_path_info(self):
+        path = self.kwargs.get('path', '')
+        return self.get_relative_path_info(path)
+
+    def get_relative_path_info(self, path):
+        # UI Safe but unhandled.
+        given_path = Path(path) # .with_suffix('.js')
+
+        srcdocs_path = models.PageModel.objects.get(pk=given_path.as_posix()).project.src_dir
+        # srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+
+        # not UI safe, DATA safe
+        given_absolute_path = Path((srcdocs_path / given_path).as_posix())
+        # This is UI safe
+        given_relative_path = Path(Path(given_absolute_path).relative_to(srcdocs_path).as_posix())
+
+        return {
+            'path': path,
+            'given': given_path,
+            'given_relative': given_relative_path,
+            'given_relative_str': str(given_relative_path.as_posix()),
+            'given_absolute': given_absolute_path,
+            'given_absolute_str': str(given_absolute_path.as_posix()),
+            'srcdocs_path': srcdocs_path,
+        }
+
+    def get_object_content(self, path_info):
+        """Return the content of the object, (the markdown text)
+        if this is a directory, the markdown content is the dir index
+        page.
+        """
+        content = ''
+        # pp(path_info)
+        filepath = path_info['given_absolute']
+        if filepath.exists() and filepath.is_file():
+            # return text
+            content = filepath.read_text(encoding='ISO-8859-1')
+        # find and return file.
+
+        return content
+
+
+class PageModelListView(views.ListView, FrameMixin):
+    model = models.PageModel
+    inner_markdown_template = './pagemodel_list.md'
+
+    def get_context_data(self, **kwargs):
+        r = super().get_context_data(**kwargs)
+        # p = self.get_path_info
+        # r['object_path_info'] = p
+
+        srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+        path = self.kwargs.get('path', '')
+        r['parenpath'] = Paren(srcdocs_path, path)
+
+        # r['object_path'] = p['path']
+        r['html_render'] = self.get_html_render()
+        r['is_rendered'] = self.get_html_render()
+        # r['trimdocs_global_frame'] = "trimdocs/base.html"
+        r['primary_include_filename'] = self.inner_markdown_template
+        r['trimdocs_global_frame'] = self.get_frame_name()
+        # r['trimdocs_global_frame'] = "trimdocs/base/null.html"
+        # r['object_content'] = self.get_object_content(p)
+        return r
+
+
+class DirectoryFileMixin:
     special_names = (
             "readme",
             "contents",
             "indicies",
         )
+
+
+    def get_markdown_object(self):
+        # context['view']
+
+        # meta into the context.
+        # HTML is the raw
+        # https://python-markdown.github.io/extensions/
+
+        md = markdown_orig.Markdown(extensions=MARKDOWN_EXTENSIONS)
+        return md
 
     def get_special_names(self):
         return self.special_names
@@ -376,6 +607,18 @@ class PathDirView(PathBaseListView):
                 if p.exists():
                     return p
 
+
+
+class PathDirView(PathBaseListView, DirectoryFileMixin):
+    """A Directory view Lists its children, and has a primary
+    file, one of the specials; hopefully a README.
+
+    The object will be the current _directory_, where the `index_filename_info`
+    is the index file.
+    """
+    template_name = 'trimdocs/dir_view.html'
+    inner_markdown_template = './dir_demo_view.md'
+
     def get_context_data(self, **kwargs):
         r = super().get_context_data(**kwargs)
         fn = self.get_directory_index_filename()
@@ -385,7 +628,7 @@ class PathDirView(PathBaseListView):
         return r
 
 
-class IndiciesPathView(PathDirView):
+class IndiciesPathView(PathDirView, DirectoryFileMixin):
     """An _indicies presents all files below as a flat list of urls.
 
     This is a _special view_ served on `trimdocs:indices`
@@ -394,6 +637,15 @@ class IndiciesPathView(PathDirView):
     special_names = (
             "indicies",
             )
+
+    def get_context_data(self, **kwargs):
+        r = super().get_context_data(**kwargs)
+        fn = self.get_directory_index_filename()
+        if fn:
+            r['object'] = self.get_relative_path_info(fn)
+        r['primary_include_filename'] = self.inner_markdown_template
+        r['object_list'] = models.PageModel.objects.order_by('origin_path')
+        return r
 
 
 class ContentsPathView(PathDirView):
@@ -406,3 +658,46 @@ class ContentsPathView(PathDirView):
     special_names = (
             "contents",
             )
+
+
+class InfoView(ContentsPathView):
+    """Present special information about the docs.
+    This render a default page or _info.md if it exists.
+    """
+    template_name = 'trimdocs/dir_view.html'
+    inner_markdown_template = './info_demo_view.md'
+    special_names = (
+            "info",
+            )
+
+class CompileView(InfoView, views.FormView):
+    """Run compile.
+    """
+    inner_markdown_template = './compile_demo_view.md'
+    special_names = (
+            "compile",
+            )
+
+    form_class = forms.CompileConfirmForm
+    success_url = views.reverse_lazy('trimdocs:info')
+
+    def form_valid(self, form):
+
+        # from django.core import management
+        # from django.core.management.commands import loaddata
+
+        # py trimdocs_project\manage.py trimdocs compile ^
+        #     --srcdocs demos\demo-srcdocs ^
+        #     --destdocs demos\demo-destdocs %*
+
+        # management.call_command("flush", verbosity=0, interactive=False)
+        p = Path('./compile_output.txt')
+        with p.open("w") as stream:
+            management.call_command("trimdocs", "compile",
+                "--srcdocs", "demos/demo-srcdocs",
+                "--destdocs", "demos/demo-destdocs",
+                stdout=stream,
+                verbosity=1)
+        # management.call_command(loaddata.Command(), "test_data", verbosity=0)
+        # run compile command
+        return super().form_valid(form)

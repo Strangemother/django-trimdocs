@@ -24,17 +24,44 @@ urlpatterns = urls.paths_named(views,
                 # Captures
                 # "path/<path:path>/_indicies/",
                 # "path/<path:path>/_indicies.md/",
-                )
-            ),
+            )
+        ),
     contents=('ContentsPathView', (
                 "contents/",
                 "contents/<path:path>/",
                 # Captures
                 # "path/<path:path>/_contents/",
                 # "path/<path:path>/_contents.md/",
-                )
+            )
+        ),
+    info=('InfoView', (
+                "info/",
+                "info/<path:path>/",
+                # Captures
+                # "path/<path:path>/_contents/",
+                # "path/<path:path>/_contents.md/",
+            )
+        ),
+    compile=('CompileView', (
+                "compile/",
+                "compile/<path:path>/",
+                # Captures
+                # "path/<path:path>/_contents/",
+                # "path/<path:path>/_contents.md/",
+            )
+        ),
+    path=('PathView', (
+                "path/",
+                "path/<path:path>/",
+                # "<str:version>/",
+                # "<str:version>/<path:path>/",
+            )
+        ),
+    detail=('PageModelDetailView', (
+                "detail/", "detail/<path:path>/"
             ),
-    path=('PathView', ("path/", "path/<path:path>/")),
+        ),
+    # list=('PageModelListView', ("dir/<path:path>/")),
     dir=('PathDirView', ("dir/", "dir/<path:path>/")),
 
     trimdocs_suppliments=('TrimdocsSupplimentsIndexTemplateView', ('', 'trimdocs/'),),

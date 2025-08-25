@@ -10,11 +10,21 @@
     <header>
         <nav>
             <ul class="widthed">
-                <li><a href="#">Home</a></li>
+                <li>
+                    {% link "trimdocs:path" "Home" %}
+                </li>
                 <li><a href="#">Contents</a></li>
-                <li><a href="#">Indicies</a></li>
+                <li>{% link "trimdocs:path" "_indicies.md" "Indicies" %}
+                    {% comment %}
+                        The indicies page can be rendered _internally_ (one of the pages)
+                        Or _outside_ the pages (as a web page only.)
+                    {% endcomment %}
+                    {# link "trimdocs:indicies" "Indicies" #}
+                </li>
                 <li class="spacer"></li>
-                <li><a href="#">Info</a></li>
+                <li>
+                    {% link "trimdocs:info" "Info" %}
+                </li>
             </ul>
         </nav>
     </header>

@@ -1,9 +1,8 @@
-{% trimdocs.breadcrumbs %}{% load strings %}
+{% trimdocs.breadcrumbs %}
 
 {% block source.content %}
-{% if object_path_info.given_relative  %}{% if object_path_info.given_absolute.is_file %}{% include object_path_info.given_relative_str %}{% endif %}{% else %}No File. {{ object_path_info }}{% endif %}
-
-
+{% if object_path_info.given_relative  %}{% if object_path_info.given_absolute.is_file %}{% include object_path_info.given_relative_str %}{% endif %}
+{% else %}No File. {{ object_path_info }}{% endif %}
 {% endblock source.content %}
 
 
