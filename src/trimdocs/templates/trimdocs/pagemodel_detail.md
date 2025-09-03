@@ -15,7 +15,7 @@
 + Metadata: {{ metadata }}
 + File `{{ object.origin_path }}`
 + Breadcrumbs {{ object.as_path.parts }}
-
++ Stashed assets: {{ asset_stash }}
 ---
 {% include "./object_info.md" %}
 {% endblock source.footer %}

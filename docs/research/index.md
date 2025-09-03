@@ -356,7 +356,6 @@ At times I may want to inject files into the output, e.g. a file with a list of 
 
 Under the hood, this will add a new _path_ to the compilation set, A unique view captures and renders (as expected). This ensures a user doesn't need to use alternative tags.
 
-<<<<<<< HEAD
 ---
 
 ### Model Backed
@@ -381,6 +380,3 @@ Job done.
 ### Flat file
 
 Convert the entire source into a single flat file, indexed by folder depth
-=======
-
->>>>>>> 430a263c700f403598872b63ad585900e1e8e4a6

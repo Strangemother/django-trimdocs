@@ -21,6 +21,9 @@ from . import nulldown
 from . import models
 from . import forms
 
+from trim.response import content_type_response, content_data_response
+
+
 
 FRAME_MAP = {
     'minimal': "trimdocs/base/minimal.html",
@@ -262,6 +265,7 @@ class PathBaseListView(views.ListView, FrameMixin):
         r['primary_include_filename'] = self.inner_markdown_template
         r['trimdocs_global_frame'] = self.get_frame_name()
         # r['trimdocs_global_frame'] = "trimdocs/base/null.html"
+        r['asset_cache'] = {'asset_stash': []}
         r['object_content'] = self.get_object_content(p)
         return r
 
@@ -393,6 +397,110 @@ class PageModel404View(views.TemplateView, FrameMixin):
         return r
 
 
+import re
+from pathlib import Path
+
+def parse_attrs_and_clean(s: str, keys=("width", "height")):
+    """
+        # Example
+        s = "foo/bar/baz/large-logo-width-400-height-auto.png"
+        attrs, clean = parse_attrs_and_clean(s)
+
+        print(attrs)
+        # {'width': 400, 'height': 'auto'}
+
+        print(clean)
+        # foo/bar/baz/large-logo.png
+    """
+    # Extract attributes
+    found = dict(re.findall(r"(\w+)-(auto|\d+)", s))
+    result = {}
+    for k in keys:
+        v = found.get(k, "auto")
+        result[k] = int(v) if v.isdigit() else v
+
+    # Remove -key-value pairs
+    clean_name = re.sub(r"-(%s)-(?:auto|\d+)" % "|".join(keys), "", s)
+    max_size = 20_000
+    clean_result = {}
+    for k,v in result.items():
+        clean_result[k] = max_size if v == 'auto' else v
+
+    return clean_result, clean_name
+
+from PIL import Image
+import glob, os
+
+from io import BytesIO
+
+from io import BytesIO
+from PIL import Image, ImageOps
+
+def thumbnail_bytes(path, size=(128, 128), fmt="PNG"):
+    with Image.open(path) as im:
+        im = ImageOps.exif_transpose(im).copy()
+        im.thumbnail(size, Image.Resampling.LANCZOS)
+        if fmt.upper() in ("JPEG", "JPG") and im.mode != "RGB":
+            im = im.convert("RGB")
+        buf = BytesIO()
+        im.save(buf, format=fmt.upper(), optimize=True)
+        buf.seek(0)
+        return buf#.getvalue()  # <- return BYTES
+
+
+class AssetView(views.TemplateView, FrameMixin):
+
+    def get_relative_path_info(self, path, srcdocs_path=None):
+        # UI  Safe but unhandled.
+        given_path = Path(path) # .with_suffix('.js')
+        # srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+        # not UI safe, DATA safe
+        given_absolute_path = Path((srcdocs_path / given_path).as_posix())
+        # This is UI safe
+        given_relative_path = Path(Path(given_absolute_path).relative_to(srcdocs_path).as_posix())
+
+        return {
+            'path': path,
+            'given': given_path,
+            'given_relative': given_relative_path,
+            'given_relative_str': str(given_relative_path.as_posix()),
+            'given_absolute': given_absolute_path,
+            'given_absolute_str': str(given_absolute_path.as_posix()),
+            'srcdocs_path': srcdocs_path,
+        }
+
+    def is_image(self, path):
+         return path.suffix in ['.png', '.jpeg', '.jpg']
+
+    def get(self, request, *args, **kwargs):
+        srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+        path = self.kwargs.get('path', '')
+        return self.get_content_response(path, srcdocs_path)
+
+    def get_content_response(self, path, srcdocs_path):
+        pv = self.get_relative_path_info(path, srcdocs_path)
+        ap = pv['given_absolute']
+        # If image, do special asset name parse.
+        print('\nassetview: static path: ', ap)
+        attrs, clean = parse_attrs_and_clean(ap.as_posix())
+        clean_path = Path(clean)
+        if clean_path.exists() and self.is_image(clean_path):
+            # do resize
+            size = (attrs.get('width', 20_000), attrs.get('height', 20_000))
+            data = thumbnail_bytes(clean_path, size=size, fmt="PNG")
+            return content_data_response(data, clean_path.with_suffix(".png"))
+
+            # buf = BytesIO()
+            # with Image.open(clean_path) as im:
+            #     im.thumbnail(size)
+            #     file = clean_path.parent / (clean_path).name
+            #     # im.save(buf, format="png")
+            #     im.save(buf, 'PNG')
+            #     buf.seek(0)
+            #     # return content_type_response(ap)
+                # return content_data_response(buf, clean_path.name)
+
+
 class PageModelDetailView(views.DetailView, FrameMixin):
     pk_url_kwarg = 'path'
     slug_field = 'origin_path'
@@ -421,6 +529,7 @@ class PageModelDetailView(views.DetailView, FrameMixin):
         r['metadata'] = metadata
         r['clean_content'] = clean_content
         r['title'] = self.get_title(r)
+        r['asset_cache'] = {'asset_stash': []}
         # r['trimdocs_global_frame'] = "trimdocs/base/null.html"
         # r['object_content'] = self.get_object_content(p)
         return r
@@ -476,8 +585,18 @@ class PageModelDetailView(views.DetailView, FrameMixin):
             # If the file exists, then we can build this file
             # on the fly.
 
-            # resolve_match = resolve(reverse(view_name, args=args, kwargs=kwargs))
+            srcdocs_path = settings.TRIMDOCS_SRC_DOCS
+            path = self.kwargs.get('path', '')
+            pv = self.get_relative_path_info(path, srcdocs_path)
+            ap = pv['given_absolute']
+
             view_class = PageModel404View
+            if self.is_image(ap) or ap.exists():
+                view_class = AssetView
+                # This is a file, but not a model.
+                # For now, assume raw return..
+
+            # resolve_match = resolve(reverse(view_name, args=args, kwargs=kwargs))
             # view_class = resolve_match.func.view_class
             # initkwargs = resolve_match.func.view_initkwargs
             # view_class.view_initkwargs = initkwargs
@@ -491,16 +610,19 @@ class PageModelDetailView(views.DetailView, FrameMixin):
             # In response, we serve the other page.
             # raise Exception('GET Custom Error')
 
+    def is_image(self, path):
+         return path.suffix in ['.png', '.jpeg', '.jpg']
+
     @cached_property
     def get_path_info(self):
         path = self.kwargs.get('path', '')
         return self.get_relative_path_info(path)
 
-    def get_relative_path_info(self, path):
-        # UI Safe but unhandled.
+    def get_relative_path_info(self, path, srcdocs_path=None):
+        # UI  Safe but unhandled.
         given_path = Path(path) # .with_suffix('.js')
 
-        srcdocs_path = models.PageModel.objects.get(pk=given_path.as_posix()).project.src_dir
+        srcdocs_path = srcdocs_path or models.PageModel.objects.get(pk=given_path.as_posix()).project.src_dir
         # srcdocs_path = settings.TRIMDOCS_SRC_DOCS
 
         # not UI safe, DATA safe
@@ -669,6 +791,7 @@ class InfoView(ContentsPathView):
     special_names = (
             "info",
             )
+
 
 class CompileView(InfoView, views.FormView):
     """Run compile.

@@ -84,6 +84,8 @@ class Command(BaseCommand):
 
         assert dest_dir.exists(), 'destdocs does not exist'
 
+        options['destdocs_abs'] = options['destdocs'].absolute()
+
         final_options = self.configure_compile_options(*args, **options)
         self.run_compile_docs(final_options)
 
@@ -177,6 +179,82 @@ class Command(BaseCommand):
             # self._out_log('Requesting', view_args, kwargs)
             template_response = instance.get(request)
             rendered = template_response.render()
+            """
+            [{
+            'csrf_token': <SimpleLazyObject: <function csrf.<locals>._get_val at 0x00000000052C43A0>>,
+            'image': {
+                'attrs': {
+                    'height': 'auto',
+                    'width': 300
+                },
+                'clean_output_path': '../images/logo.png',
+                'rel_input_path': './images/logo.png',
+                'rel_output_path': '../images/logo-width-300-height-auto.png',
+                'title': 'title'
+            },
+            'width': 300
+            }]
+
+            """
+            stash = rendered.context_data.get('asset_cache', {}).get('asset_stash', [])
+            for item in stash:
+                # copy
+                print('+ Asset found:', item['asset_type'], item['rel_output_path'])
+                asset_request = R()
+                view_name = 'trimdocs:asset'
+                asset_resolve_match = resolve(reverse(view_name, args=view_args))
+                asset_view_class = asset_resolve_match.func.view_class
+                asset_initkwargs = asset_resolve_match.func.view_initkwargs
+                asset_view_class.view_initkwargs = asset_initkwargs
+                asset_kwargs = kwargs.copy()
+                # asset_kwargs['path'] = item['rel_output_path']
+                asset_instance = asset_view_class(**asset_initkwargs)
+                asset_instance.setup(asset_request, *view_args, **asset_kwargs)
+                # self._out_log('Requesting', view_args, kwargs)
+
+                # asset_template_response = asset_instance.get(asset_request)
+                # asset_rendered = asset_template_response.render()
+
+                srcdocs_path = Path(settings.TRIMDOCS_SRC_DOCS) / asset_kwargs['path']
+                stein_path = srcdocs_path / item['rel_output_path']
+                # returns <FileResponse status_code=200, "image/png">
+                asset_template_response = asset_instance.get_content_response(
+                        item['rel_output_path'],
+                        srcdocs_path=srcdocs_path
+                    )
+                print('= Asset to store is', asset_template_response, 'at', item['rel_output_path'])
+                rr = asset_template_response
+                destdocs_abs = options['destdocs_abs']
+                destdocs_path = Path(destdocs_abs) / asset_kwargs['path']
+                out_stein_path = destdocs_path / item['rel_output_path']
+                print('. Store to', out_stein_path.resolve())
+                # Output path is the dest.
+                oo = out_stein_path.resolve()
+                ok = False
+                if oo.exists() is True:
+                    print('File exists.', oo)
+                else:
+                    if oo.parent.exists() is False:
+                        # if can create..
+                        # Is in the destination directory:
+                        if oo.parent.relative_to(destdocs_abs):
+                            # make the target
+                            print('Creating', oo.parent)
+                            oo.parent.mkdir(True)
+                            assert oo.parent.exists(), f"Directory path does not exist. {oo.parent}"
+                            ok = True
+                    else:
+                        ok = True
+                        print('Parent directory already exists.')
+
+                if ok:
+                    with oo.open('wb') as stream:
+                        for chunk in rr.streaming_content:
+                            # write to store.
+                            stream.write(chunk)
+                    print('written', oo)
+
+
 
             # template = template_response.resolve_template(template_response.template_name)
             # context = template_response.resolve_context(template_response.context_data)

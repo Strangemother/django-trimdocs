@@ -61,6 +61,11 @@ urlpatterns = urls.paths_named(views,
                 "detail/", "detail/<path:path>/"
             ),
         ),
+    asset=('AssetView', (
+                "asset/", "asset/<path:path>/"
+            ),
+        ),
+
     # list=('PageModelListView', ("dir/<path:path>/")),
     dir=('PathDirView', ("dir/", "dir/<path:path>/")),
 

@@ -100,6 +100,33 @@ main.html {
     /* border: solid; */
 }
 
+main table tbody td {
+    border-bottom: solid 1px #000;
+    border-left: solid 1px #000;
+    padding: 0.1em .5em;
+}
+
+main table tbody td:first-child {
+    border-left: none;
+}
+
+main table th {
+    background: #000;
+    border-radius: 0;
+    padding: 0.2em 0;
+    border-left: solid 1px #111;
+}
+
+main table th:first-child {
+    border-radius: 0.6em 0em 0 0;
+}
+
+main table th:last-child {
+    border-radius: 0 0.6em 0 0;
+    border-left: none;
+}
+
+
 ul.widthed {
     max-width: 1100px;
 }
@@ -136,4 +163,15 @@ ul.breadcrumbs li:last-child:after {
 
 main pre code {
     background: initial;
+}
+
+main table {
+    /* border: solid 1px #000; */
+    border-radius: 0.4em;
+    border-collapse: collapse;
+}
+
+main > pre {
+    background: #090909;
+    padding: 1rem;
 }
